@@ -1,0 +1,216 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
+
+enum SessionStatus {
+  PHASE1_IN_PROGRESS
+  PHASE1_COMPLETE
+  PHASE2_ACTIVE
+  COMPLETE
+}
+
+enum ConstructStatus {
+  PENDING
+  APPROVED
+  OVERRIDDEN
+}
+
+enum Phase1Step {
+  ONBOARDING
+  CONSTRUCT_INTERROGATION
+  COVERAGE_ASSESSMENT
+  QUESTION_REFINEMENT
+  PROBE_DEVELOPMENT
+  COMPLETE
+}
+
+// ─────────────────────────────────────────────
+// NextAuth required models
+// ─────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  institution   String    @default("")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+  studySessions StudySession[]
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+// ─────────────────────────────────────────────
+// Study Session — central record linking both phases
+// ─────────────────────────────────────────────
+
+model StudySession {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  title       String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  status      SessionStatus @default(PHASE1_IN_PROGRESS)
+  currentStep Phase1Step    @default(ONBOARDING)
+
+  // Researcher context collected at onboarding
+  researchQuestion     String? @db.Text
+  theoreticalFramework String? @db.Text
+  targetPopulation     String? @db.Text
+
+  // Phase 1 conversation history: array of { role, content, timestamp }
+  conversationHistory Json?
+
+  // Phase 1 final outputs (populated when Phase 1 is complete)
+  phase1Output Json?
+  coverageMap  Json?
+
+  // Relations
+  constructs    Construct[]
+  overrideLogs  OverrideLog[]
+  guide         InterviewGuide?
+  uploadedFiles UploadedFile[]
+  participants  ParticipantSession[]
+}
+
+// ─────────────────────────────────────────────
+// Researcher-uploaded context documents (Phase 1 onboarding)
+// ─────────────────────────────────────────────
+
+model UploadedFile {
+  id         String       @id @default(cuid())
+  sessionId  String
+  session    StudySession @relation(fields: [sessionId], references: [id])
+  fileName   String
+  mimeType   String
+  parsedText String       @db.LongText
+  uploadedAt DateTime     @default(now())
+}
+
+// ─────────────────────────────────────────────
+// Constructs — one record per theoretical construct per session
+// ─────────────────────────────────────────────
+
+model Construct {
+  id                 String          @id @default(cuid())
+  sessionId          String
+  session            StudySession    @relation(fields: [sessionId], references: [id])
+  name               String
+  definition         String          @db.Text
+  operationalization String?         @db.Text
+  status             ConstructStatus @default(PENDING)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  overrideLogs       OverrideLog[]
+}
+
+// ─────────────────────────────────────────────
+// Override Log — PRIMARY RESEARCH DATA, never delete
+// ─────────────────────────────────────────────
+
+model OverrideLog {
+  id                 String       @id @default(cuid())
+  sessionId          String
+  session            StudySession @relation(fields: [sessionId], references: [id])
+  constructId        String?
+  construct          Construct?   @relation(fields: [constructId], references: [id])
+  phase1Step         Phase1Step
+  flagText           String       @db.Text
+  aiRecommendation   String       @db.Text
+  researcherDecision String       @db.Text
+  justificationText  String       @db.Text
+  timestamp          DateTime     @default(now())
+}
+
+// ─────────────────────────────────────────────
+// Interview Guide — Phase 1 final output, unlocks Phase 2
+// ─────────────────────────────────────────────
+
+model InterviewGuide {
+  id        String       @id @default(cuid())
+  sessionId String       @unique
+  session   StudySession @relation(fields: [sessionId], references: [id])
+
+  // Array of { id, text, constructIds, sequenceOrder, rationaleNote }
+  questions Json
+
+  // Map of questionId -> [{ id, text, probeType }]
+  // probeType: elaboration | affective | specificity | contradiction
+  probes Json
+
+  // Matrix of constructId -> questionId[]
+  coverageMap Json
+
+  approvedAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────
+// Participant Session — one per interview, no PII
+// ─────────────────────────────────────────────
+
+model ParticipantSession {
+  id             String       @id @default(cuid())
+  sessionId      String
+  session        StudySession @relation(fields: [sessionId], references: [id])
+  token          String       @unique @default(cuid())
+  tokenExpiresAt DateTime
+  createdAt      DateTime     @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+
+  // Array of { role, content, timestamp, layerTag }
+  // layerTag: core_q1 | core_q2 | core_q3 | probe_elaboration | probe_affective
+  //           | probe_contextual | probe_contradiction | closing
+  transcript Json?
+
+  // { detectedContext, probesDeployed, totalDurationSeconds, closingReached }
+  sessionLog Json?
+}

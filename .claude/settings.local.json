@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \":*)",
+      "Bash(py --version)",
+      "Bash(python -c \":*)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}
