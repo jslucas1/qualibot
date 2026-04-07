@@ -3,6 +3,7 @@ import type { NextAuthConfig } from "next-auth";
 const PUBLIC_PATHS = ["/", "/sign-in", "/sign-up", "/api/auth", "/interview"];
 
 export const authConfig: NextAuthConfig = {
+  trustHost: true,
   pages: {
     signIn: "/sign-in",
     verifyRequest: "/sign-in/verify",
