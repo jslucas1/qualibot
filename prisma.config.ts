@@ -14,10 +14,6 @@ const dbUrl = process.env.DATABASE_URL
 
 export default defineConfig({
   schema: 'prisma/schema.prisma',
-  migrations: {
-    path: 'prisma/migrations',
-  },
-  engine: 'classic',
   ...(dbUrl
     ? {
         datasource: {
