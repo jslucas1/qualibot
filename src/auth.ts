@@ -6,6 +6,7 @@ import { authConfig } from "@/auth.config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  trustHost: true,
   adapter: PrismaAdapter(prisma),
   // JWT strategy: session is encoded in a cookie — no DB lookup required.
   // This works reliably in Next.js 15 Route Handlers and Server Components
