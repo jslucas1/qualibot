@@ -1,24 +1,23 @@
 import Link from "next/link";
 import { getAuthenticatedUser } from "@/lib/researcher";
 import { prisma } from "@/lib/prisma";
+import { SessionStatus } from "@prisma/client";
 import { NewSessionButton } from "@/components/dashboard/NewSessionButton";
 
 // ── Status badge ─────────────────────────────────────────────────────────────
 
-type SessionStatus = "PHASE1_IN_PROGRESS" | "PHASE1_COMPLETE" | "PHASE2_ACTIVE" | "COMPLETE";
-
 const STATUS_LABELS: Record<SessionStatus, string> = {
-  PHASE1_IN_PROGRESS: "Phase 1 — In Progress",
-  PHASE1_COMPLETE: "Phase 1 — Complete",
-  PHASE2_ACTIVE: "Interviews Active",
-  COMPLETE: "Complete",
+  [SessionStatus.PHASE1_IN_PROGRESS]: "Phase 1 — In Progress",
+  [SessionStatus.PHASE1_COMPLETE]: "Phase 1 — Complete",
+  [SessionStatus.PHASE2_ACTIVE]: "Interviews Active",
+  [SessionStatus.COMPLETE]: "Complete",
 };
 
 const STATUS_COLORS: Record<SessionStatus, string> = {
-  PHASE1_IN_PROGRESS: "bg-yellow-100 text-yellow-800",
-  PHASE1_COMPLETE: "bg-blue-100 text-blue-800",
-  PHASE2_ACTIVE: "bg-green-100 text-green-800",
-  COMPLETE: "bg-gray-100 text-gray-700",
+  [SessionStatus.PHASE1_IN_PROGRESS]: "bg-yellow-100 text-yellow-800",
+  [SessionStatus.PHASE1_COMPLETE]: "bg-blue-100 text-blue-800",
+  [SessionStatus.PHASE2_ACTIVE]: "bg-green-100 text-green-800",
+  [SessionStatus.COMPLETE]: "bg-gray-100 text-gray-700",
 };
 
 function StatusBadge({ status }: { status: SessionStatus }) {
@@ -48,7 +47,7 @@ export default async function DashboardPage() {
 
   const total = sessions.length;
   const active = sessions.filter(
-    (s) => s.status === "PHASE1_IN_PROGRESS" || s.status === "PHASE2_ACTIVE"
+    (s) => s.status === SessionStatus.PHASE1_IN_PROGRESS || s.status === SessionStatus.PHASE2_ACTIVE
   ).length;
   const totalInterviews = sessions.reduce(
     (sum, s) => sum + s._count.participants,
@@ -116,7 +115,7 @@ export default async function DashboardPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <StatusBadge status={session.status as SessionStatus} />
+                    <StatusBadge status={session.status} />
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-700">
                     {session._count.participants}
