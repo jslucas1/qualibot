@@ -193,6 +193,29 @@ model InterviewGuide {
 }
 
 // ─────────────────────────────────────────────
+// RAG Knowledge Base — IS methodology chunks
+// ─────────────────────────────────────────────
+
+model KnowledgeChunk {
+  id           String   @id @default(cuid())
+  filename     String
+  citation     String
+  journal      String
+  year         Int
+  documentType String
+  // JSON array of domain strings, e.g. ["construct_operationalization","question_design_principles"]
+  // Domains: construct_operationalization | coverage_assessment | question_design_principles | probe_development
+  domains      Json
+  chunkIndex   Int
+  text         String   @db.LongText
+  // voyage-3 embedding — 1024-element float array stored as JSON
+  embedding    Json
+  createdAt    DateTime @default(now())
+
+  @@index([filename])
+}
+
+// ─────────────────────────────────────────────
 // Participant Session — one per interview, no PII
 // ─────────────────────────────────────────────
 
